@@ -1,69 +1,129 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Suspense } from "react";
+import { supabase } from "@/lib/supabase";
+import { CATEGORIES } from "@/lib/categories";
+import { formatPrice } from "@/lib/format";
+import type { Listing } from "@/lib/types";
 
-export default function Home() {
+type SearchParams = { q?: string; category?: string; min?: string; max?: string };
+type Card = Pick<Listing, "id" | "title" | "price" | "location" | "image_url">;
+
+function href(params: Record<string, string>) {
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value) sp.set(key, value);
+  const qs = sp.toString();
+  return qs ? `/?${qs}` : "/";
+}
+
+async function Marketplace({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const { q = "", category = "", min = "", max = "" } = await searchParams;
+
+  let query = supabase
+    .from("listings")
+    .select("id, title, price, location, image_url")
+    .order("created_at", { ascending: false })
+    .limit(60);
+
+  // strip characters that have special meaning in the filter syntax
+  const term = q.replace(/[%_,()\\*]/g, " ").trim();
+  if (term) query = query.or(`title.ilike.%${term}%,description.ilike.%${term}%`);
+
+  if ((CATEGORIES as readonly string[]).includes(category)) {
+    query = query.eq("category", category);
+  }
+  if (min !== "" && !Number.isNaN(Number(min))) query = query.gte("price", Number(min));
+  if (max !== "" && !Number.isNaN(Number(max))) query = query.lte("price", Number(max));
+
+  const { data, error } = await query;
+  const listings = (data ?? []) as Card[];
+  const filtered = Boolean(term || category || min || max);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="shell">
+      <aside className="sidebar">
+        <h1 className="side-title">Marketplace</h1>
+
+        <form action="/" className="filters">
+          {category && <input type="hidden" name="category" value={category} />}
+          <input
+            className="field"
+            name="q"
+            defaultValue={q}
+            placeholder="Search Marketplace"
+          />
+          <div className="price-row">
+            <input className="field" name="min" type="number" min="0" defaultValue={min} placeholder="Min" />
+            <span>to</span>
+            <input className="field" name="max" type="number" min="0" defaultValue={max} placeholder="Max" />
+          </div>
+          <button className="btn block">Search</button>
+        </form>
+
+        <h2 className="side-sub">Categories</h2>
+        <ul className="cats">
+          <li>
+            <Link className={!category ? "active" : ""} href={href({ q, min, max })}>
+              All
+            </Link>
+          </li>
+          {CATEGORIES.map((c) => (
+            <li key={c}>
+              <Link
+                className={category === c ? "active" : ""}
+                href={href({ q, min, max, category: c })}
+              >
+                {c}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </aside>
+
+      <main className="results">
+        <h2 className="results-title">{filtered ? "Search results" : "Today's picks"}</h2>
+
+        {error && <p className="error">Couldn&apos;t load listings: {error.message}</p>}
+
+        {!error && listings.length === 0 && (
+          <p className="muted">
+            No listings found. <Link href="/sell" className="link">Create one</Link>.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        )}
+
+        <div className="grid">
+          {listings.map((l) => (
+            <Link key={l.id} href={`/listing/${l.id}`} className="card">
+              <div className="card-img">
+                {l.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={l.image_url} alt={l.title} loading="lazy" />
+                ) : (
+                  <span>No photo</span>
+                )}
+              </div>
+              <div className="card-price">{formatPrice(l.price)}</div>
+              <div className="card-title">{l.title}</div>
+              {l.location && <div className="card-loc">{l.location}</div>}
+            </Link>
+          ))}
         </div>
       </main>
     </div>
+  );
+}
+
+export default function Home({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  return (
+    <Suspense fallback={<p className="muted" style={{ padding: 20 }}>Loading...</p>}>
+      <Marketplace searchParams={searchParams} />
+    </Suspense>
   );
 }
