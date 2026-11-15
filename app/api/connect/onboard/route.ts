@@ -10,6 +10,7 @@ function fail(error: string, status = 400) {
 
 export async function POST(req: Request) {
   let body: { email?: unknown };
+
   try {
     body = await req.json();
   } catch {
@@ -17,13 +18,16 @@ export async function POST(req: Request) {
   }
 
   const email = String(body.email ?? "").trim().toLowerCase();
-  if (!EMAIL_RE.test(email) || email.length > 254) return fail("Please enter a valid email.");
+
+  if (!EMAIL_RE.test(email) || email.length > 254) {
+    return fail("Please enter a valid email.");
+  }
 
   try {
     const stripe = getStripe();
     const admin = getAdmin();
 
-    // 1. find the seller's Stripe account, or create it
+    // Find existing seller account
     const { data: seller } = await admin
       .from("sellers")
       .select("stripe_account_id")
@@ -32,38 +36,57 @@ export async function POST(req: Request) {
 
     let accountId = seller?.stripe_account_id;
 
+    // Create Stripe connected account
     if (!accountId) {
       const account = await stripe.accounts.create({
-        type: "express",
+        country: "US",
         email,
+
         capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true },
+          card_payments: {
+            requested: true,
+          },
+          transfers: {
+            requested: true,
+          },
         },
-        metadata: { seller_email: email },
+
+        metadata: {
+          seller_email: email,
+        },
       });
 
       const { error: insertError } = await admin
         .from("sellers")
-        .insert({ email, stripe_account_id: account.id });
+        .insert({
+          email,
+          stripe_account_id: account.id,
+        });
 
       if (insertError) {
-        // two clicks at once: use the row that won
+        // Handle duplicate clicks
         const { data: existing } = await admin
           .from("sellers")
           .select("stripe_account_id")
           .eq("email", email)
           .maybeSingle();
-        if (!existing) return fail("Could not save your account.", 500);
+
+        if (!existing) {
+          return fail("Could not save your account.", 500);
+        }
+
         accountId = existing.stripe_account_id;
       } else {
         accountId = account.id;
       }
     }
 
-    // 2. create a fresh onboarding link (they expire quickly, so never reuse one)
+    // Create onboarding link
     const origin = new URL(req.url).origin;
-    const returnUrl = `${origin}/seller/return?email=${encodeURIComponent(email)}`;
+
+    const returnUrl = `${origin}/seller/return?email=${encodeURIComponent(
+      email
+    )}`;
 
     const link = await stripe.accountLinks.create({
       account: accountId,
@@ -72,9 +95,18 @@ export async function POST(req: Request) {
       return_url: returnUrl,
     });
 
-    return NextResponse.json({ url: link.url });
+    return NextResponse.json({
+      url: link.url,
+    });
+
   } catch (e) {
     console.error("Onboarding error:", e);
-    return fail(e instanceof Error ? e.message : "Could not start onboarding.", 500);
+
+    return fail(
+      e instanceof Error
+        ? e.message
+        : "Could not start onboarding.",
+      500
+    );
   }
 }

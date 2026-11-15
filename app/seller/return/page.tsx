@@ -45,7 +45,12 @@ async function Status({
           Stripe is ready to pay you. Listings that use <strong>{clean}</strong> now
           show a Buy Now button.
         </p>
-        <Link href="/" className="btn primary">Back to Marketplace</Link>
+        <div className="nav-actions">
+          <Link href={`/sell?email=${encodeURIComponent(clean)}`} className="btn primary">
+            Create a listing
+          </Link>
+          <Link href="/" className="btn">Back to Marketplace</Link>
+        </div>
       </>
     );
   }
@@ -57,6 +62,18 @@ async function Status({
         Stripe still needs a few details, or is reviewing them. Continue where you
         left off, or refresh this page in a few seconds.
       </p>
+
+      <ul className="status-list">
+        <li>Details submitted: <strong>{status.detailsSubmitted ? "yes" : "no"}</strong></li>
+        <li>Payments enabled: <strong>{status.chargesEnabled ? "yes" : "no"}</strong></li>
+        {status.disabledReason && (
+          <li>Stripe says: <strong>{status.disabledReason}</strong></li>
+        )}
+        {status.due.length > 0 && (
+          <li>Still needed: <strong>{status.due.join(", ")}</strong></li>
+        )}
+      </ul>
+
       <ConnectForm initialEmail={clean} label="Continue onboarding" />
     </>
   );

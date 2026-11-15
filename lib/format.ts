@@ -1,4 +1,4 @@
-const CURRENCY = "PHP"; // change to "PHP" for pesos
+export const CURRENCY = "PHP"; // change to "PHP" for pesos
 
 export function formatPrice(price: number) {
   if (price === 0) return "Free";

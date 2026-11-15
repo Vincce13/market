@@ -2,9 +2,11 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { refreshSeller } from "@/lib/sellers";
 import { formatPrice, timeAgo } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import MessageSeller from "@/components/MessageSeller";
+import BuyButton from "@/components/BuyButton";
 
 async function ListingContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,6 +22,16 @@ async function ListingContent({ params }: { params: Promise<{ id: string }> }) {
   if (!data) notFound();
   const l = data as Listing;
 
+  // Ask Stripe live, so the button appears as soon as onboarding is finished
+  let sellerReady = false;
+  try {
+    sellerReady = (await refreshSeller(l.seller_email.toLowerCase())).ready;
+  } catch (e) {
+    console.error("Seller status check failed:", e);
+  }
+
+  const canBuy = sellerReady && !l.sold && l.price >= 0.5;
+
   return (
     <div className="detail">
       <div className="detail-media">
@@ -34,11 +46,19 @@ async function ListingContent({ params }: { params: Promise<{ id: string }> }) {
       <div className="detail-info">
         <Link href="/" className="link">← Back to Marketplace</Link>
         <h1>{l.title}</h1>
-        <div className="detail-price">{formatPrice(l.price)}</div>
+        <div className="detail-price">
+          {formatPrice(l.price)}
+          {l.sold && <span className="sold-pill">Sold</span>}
+        </div>
         <p className="muted">
           Listed {timeAgo(l.created_at)}
           {l.location && ` in ${l.location}`}
         </p>
+
+        {canBuy && <BuyButton listingId={l.id} priceLabel={formatPrice(l.price)} />}
+        {!l.sold && !sellerReady && (
+          <p className="hint">This seller hasn&apos;t set up online payments yet.</p>
+        )}
 
         <dl className="facts">
           <dt>Category</dt>

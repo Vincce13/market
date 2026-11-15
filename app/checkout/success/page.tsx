@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { recordOrder } from "@/lib/orders";
 import { getAdmin } from "@/lib/supabase-admin";
 import { formatPrice } from "@/lib/format";
@@ -9,6 +10,8 @@ async function Result({
 }: {
   searchParams: Promise<{ session_id?: string }>;
 }) {
+  await connection(); // run only when a real visitor requests the page
+
   const { session_id } = await searchParams;
 
   if (!session_id || !session_id.startsWith("cs_")) {
@@ -81,4 +84,4 @@ export default function SuccessPage({
       </div>
     </div>
   );
-}   
+}

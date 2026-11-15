@@ -145,4 +145,6 @@ textarea.field { resize: vertical; }
 
 
   .nav-actions { display: flex; gap: 8px; }
+
+  .status-list { margin: 14px 0; padding-left: 18px; line-height: 1.7; }
 }

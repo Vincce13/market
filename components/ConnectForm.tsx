@@ -15,15 +15,19 @@ export default function ConnectForm({
 
   async function start(e: React.FormEvent) {
     e.preventDefault();
+
     setBusy(true);
     setError("");
 
     try {
       const res = await fetch("/api/connect/onboard", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ email }),
       });
+
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok || !json.url) {
@@ -31,7 +35,9 @@ export default function ConnectForm({
         setBusy(false);
         return;
       }
-      window.location.href = json.url; // go to Stripe's hosted onboarding
+
+      window.location.href = json.url;
+
     } catch {
       setError("Network error. Please try again.");
       setBusy(false);
@@ -40,20 +46,33 @@ export default function ConnectForm({
 
   return (
     <form onSubmit={start}>
-      <label className="label">Your email</label>
+      <label className="label">
+        Your Stripe account email
+      </label>
+
       <input
         className="field"
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        placeholder="The email you use on your listings"
+        placeholder="seller@example.com"
         required
       />
-      <p className="hint">Buyers will see Buy Now on listings that use this email.</p>
 
-      {error && <p className="error">{error}</p>}
+      <p className="hint">
+        Connect Stripe to receive payments from your listings.
+      </p>
 
-      <button className="btn primary block" disabled={busy}>
+      {error && (
+        <p className="error">
+          {error}
+        </p>
+      )}
+
+      <button
+        className="btn primary block"
+        disabled={busy}
+      >
         {busy ? "Redirecting to Stripe..." : label}
       </button>
     </form>
