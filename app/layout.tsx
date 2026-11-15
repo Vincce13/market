@@ -16,7 +16,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="logo">m</span>
               marketplace
             </Link>
-            <Link href="/sell" className="btn primary">+ Create new listing</Link>
+            <div className="nav-actions">
+  <Link href="/seller" className="btn">Connect with Stripe</Link>
+  <Link href="/sell" className="btn primary">+ Create new listing</Link>
+</div>
           </div>
         </header>
         {children}
